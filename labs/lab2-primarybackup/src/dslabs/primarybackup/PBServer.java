@@ -66,7 +66,7 @@ class PBServer extends Node {
     pendingClient = sender;
     pendingRequest = m;
     send(new Forward(m.command()), view.backup());
-    set(new ForwardTimer(view.backup()), ForwardTimer.FORWARD_MILLIS);
+    set(new ForwardTimer(m.command(), view.viewNum()), ForwardTimer.FORWARD_MILLIS);
   }
 
   private void handleForward(Forward m, Address sender) {
@@ -101,8 +101,16 @@ class PBServer extends Node {
   private void handleViewReply(ViewReply m, Address sender) {
     // Your code here...
     View old = this.view;
+    if(old != null && m.view().viewNum() <= old.viewNum()){
+      return;
+    }
     this.view = m.view();
-
+    
+    // on view change, clear the pending state otherwise server will stuck, the client can't retry cause
+    // pending != null, yet when forward timer fires, it can do nothing cause the stale pending request 
+    // doesn't match the new view.
+    pendingClient = null;
+    pendingRequest = null;
     // either init or it was the backup||primary
     if(isPrimary()){
       if(view.backup() == null) {
@@ -114,8 +122,6 @@ class PBServer extends Node {
       }
     } else { // idle or backup, clean the state
       synced = true;
-      pendingClient = null;
-      pendingRequest = null;
     }
   }
 
@@ -140,10 +146,13 @@ class PBServer extends Node {
       set(t, StateTransferTimer.STATE_TRANSFER_MILLIS);
     }
   }
-  // just let the client retry
+  // can't just let the client retry, too slow causing timeout, need to retransmit.
   private void onForwardTimer(ForwardTimer t) {
-    pendingClient = null;
-    pendingRequest = null;
+    if(pendingRequest != null && isPrimary() && synced && view != null && view.viewNum() == t.viewNum()
+      && pendingRequest.command().equals(t.command()))  {
+      send(new Forward(pendingRequest.command()), view.backup());
+      set(t, ForwardTimer.FORWARD_MILLIS);
+    }
   }
 
   /* -----------------------------------------------------------------------------------------------

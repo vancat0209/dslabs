@@ -96,12 +96,12 @@ class PBClient extends Node implements Client {
   /* -----------------------------------------------------------------------------------------------
    *  Timer Handlers
    * ---------------------------------------------------------------------------------------------*/
+  // only set timer when sending the request. don't duplicate timer.
   private synchronized void onClientTimer(ClientTimer t) {
     // Your code here...
     if(t.sequenceNum() == sequenceNum && result == null) {
       send(new GetView(), viewServer);
       sendRequestToPrimary();
-      set(t, ClientTimer.CLIENT_RETRY_MILLIS);
     }
   }
 }

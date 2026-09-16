@@ -34,5 +34,6 @@ final class StateTransferTimer implements Timer {
 @Data 
 final class ForwardTimer implements Timer {
   static final int FORWARD_MILLIS = 100;
-  private final Address backup;
+  private final AMOCommand command;
+  private final int viewNum;
 }
