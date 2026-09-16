@@ -3,7 +3,6 @@ package dslabs.primarybackup;
 import dslabs.atmostonce.AMOApplication;
 import dslabs.atmostonce.AMOCommand;
 import dslabs.atmostonce.AMOResult;
-import dslabs.framework.Address;
 import dslabs.framework.Application;
 import dslabs.framework.Message;
 import lombok.Data;
@@ -49,9 +48,6 @@ class Forward implements Message {
 class ForwardReply implements Message {
   private final boolean success;
   private final AMOResult result;
-  // Client address + sequenceNum uniquely identifies which forwarded request this replies to
-  private final Address clientAddress;
-  private final int sequenceNum;
 }
 
 @Data 

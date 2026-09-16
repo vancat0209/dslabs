@@ -3,7 +3,6 @@ package dslabs.primarybackup;
 import java.util.Objects;
 
 import dslabs.atmostonce.AMOApplication;
-import dslabs.atmostonce.AMOCommand;
 import dslabs.atmostonce.AMOResult;
 import dslabs.framework.Address;
 import dslabs.framework.Application;
@@ -72,25 +71,19 @@ class PBServer extends Node {
 
   private void handleForward(Forward m, Address sender) {
     if(isPrimary()) {
-      send (new ForwardReply(false, null, m.command().address(), m.command().sequenceNum()), sender);
+      send (new ForwardReply(false, null), sender);
       return;
     }
     if(!isBackup() || !sender.equals(view.primary())) {
-      send(new ForwardReply(false, null, m.command().address(), m.command().sequenceNum()), sender);
+      send(new ForwardReply(false, null), sender);
       return;
     }
     AMOResult res = app.execute(m.command());
-    send(new ForwardReply(true, res, m.command().address(), m.command().sequenceNum()), sender);
+    send(new ForwardReply(true, res), sender);
   }
 
   private void handleForwardReply(ForwardReply m, Address sender) {
     if(pendingClient == null|| pendingRequest == null) {
-      return;
-    }
-    // Verify this reply is for the CURRENT pending request (not a stale one)
-    AMOCommand pendingCmd = pendingRequest.command();
-    if (!m.clientAddress().equals(pendingCmd.address()) || m.sequenceNum() != pendingCmd.sequenceNum()) {
-      // Stale reply from a previous forward - ignore it
       return;
     }
     if(!isPrimary() || !m.success() || !sender.equals(view.backup()) || !synced) {
@@ -114,14 +107,8 @@ class PBServer extends Node {
     if(isPrimary()){
       if(view.backup() == null) {
         synced = true;
-        // Clear pending if backup is gone - let client retry
-        pendingClient = null;
-        pendingRequest = null;
       } else if(old == null || old.backup() == null || !Objects.equals(old.backup(), view.backup())) {
         synced = false;
-        // Backup changed - clear pending so client will retry with new backup
-        pendingClient = null;
-        pendingRequest = null;
         send(new StateTransfer(app, view.viewNum()), view.backup());
         set(new StateTransferTimer(view.backup(), view.viewNum()), StateTransferTimer.STATE_TRANSFER_MILLIS);
       }
@@ -155,10 +142,6 @@ class PBServer extends Node {
   }
   // just let the client retry
   private void onForwardTimer(ForwardTimer t) {
-    // Only clear pending if timer is for current backup
-    if (!isPrimary() || view.backup() == null || !t.backup().equals(view.backup())) {
-      return;
-    }
     pendingClient = null;
     pendingRequest = null;
   }
@@ -188,10 +171,6 @@ class PBServer extends Node {
 
   //backup receive state transfer from primary
   private void handleStateTransfer(StateTransfer m, Address sender) {
-    // Only accept state from current primary
-    if (!isBackup() || view == null || !sender.equals(view.primary())) {
-      return;
-    }
     this.app = m.app();
     send(new StateTransferReply(m.viewNum()), sender);
   }
