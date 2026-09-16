@@ -1,5 +1,6 @@
 package dslabs.primarybackup;
 
+import dslabs.atmostonce.AMOCommand;
 import dslabs.framework.Address;
 import dslabs.framework.Client;
 import dslabs.framework.Command;
@@ -14,6 +15,11 @@ class PBClient extends Node implements Client {
   private final Address viewServer;
 
   // Your code here...
+  private Command command;
+  private int sequenceNum = 0;
+  private Result result;
+
+  private View view;
 
   /* -----------------------------------------------------------------------------------------------
    *  Construction and Initialization
@@ -26,6 +32,7 @@ class PBClient extends Node implements Client {
   @Override
   public synchronized void init() {
     // Your code here...
+    send(new GetView(), viewServer);
   }
 
   /* -----------------------------------------------------------------------------------------------
@@ -34,18 +41,35 @@ class PBClient extends Node implements Client {
   @Override
   public synchronized void sendCommand(Command command) {
     // Your code here...
+    sequenceNum++;
+    this.command = command;
+    this.result = null;
+    sendRequestToPrimary();
   }
 
   @Override
   public synchronized boolean hasResult() {
     // Your code here...
-    return false;
+    return result != null;
   }
 
   @Override
   public synchronized Result getResult() throws InterruptedException {
     // Your code here...
-    return null;
+    while (result == null) {
+      wait();
+    }
+    return result;
+  }
+
+  private void sendRequestToPrimary() {
+    if (view == null || view.primary() == null) {
+      send(new GetView(), viewServer);
+      return;
+    }
+    AMOCommand amo = new AMOCommand(command, address(), sequenceNum);
+    send(new Request(amo), view.primary());
+    set(new ClientTimer(sequenceNum), ClientTimer.CLIENT_RETRY_MILLIS);
   }
 
   /* -----------------------------------------------------------------------------------------------
@@ -53,10 +77,18 @@ class PBClient extends Node implements Client {
    * ---------------------------------------------------------------------------------------------*/
   private synchronized void handleReply(Reply m, Address sender) {
     // Your code here...
+    if (m.result().sequenceNum() == sequenceNum && result == null) {
+      result = m.result().result();
+      notify();
+    }
   }
 
   private synchronized void handleViewReply(ViewReply m, Address sender) {
     // Your code here...
+    this.view = m.view();
+    if(command != null && result == null) {
+      sendRequestToPrimary();
+    }
   }
 
   // Your code here...
@@ -66,5 +98,10 @@ class PBClient extends Node implements Client {
    * ---------------------------------------------------------------------------------------------*/
   private synchronized void onClientTimer(ClientTimer t) {
     // Your code here...
+    if(t.sequenceNum() == sequenceNum && result == null) {
+      send(new GetView(), viewServer);
+      sendRequestToPrimary();
+      set(t, ClientTimer.CLIENT_RETRY_MILLIS);
+    }
   }
 }

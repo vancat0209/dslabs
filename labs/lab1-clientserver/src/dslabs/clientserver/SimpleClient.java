@@ -1,5 +1,6 @@
 package dslabs.clientserver;
 
+import dslabs.atmostonce.AMOCommand;
 import dslabs.framework.Address;
 import dslabs.framework.Client;
 import dslabs.framework.Command;
@@ -19,6 +20,9 @@ class SimpleClient extends Node implements Client {
   private final Address serverAddress;
 
   // Your code here...
+  private Command command;
+  private int sequenceNum = 0;
+  private Result result;
 
   /* -----------------------------------------------------------------------------------------------
    *  Construction and Initialization
@@ -39,18 +43,26 @@ class SimpleClient extends Node implements Client {
   @Override
   public synchronized void sendCommand(Command command) {
     // Your code here...
+    sequenceNum++;
+    this.command = command;
+    this.result = null;
+    send(new Request(new AMOCommand(command, address(), sequenceNum)), serverAddress);
+    set(new ClientTimer(sequenceNum), ClientTimer.CLIENT_RETRY_MILLIS);
   }
 
   @Override
   public synchronized boolean hasResult() {
     // Your code here...
-    return false;
+    return result != null;
   }
 
   @Override
   public synchronized Result getResult() throws InterruptedException {
     // Your code here...
-    return null;
+    while (result == null) {
+      wait();
+    }
+    return result;
   }
 
   /* -----------------------------------------------------------------------------------------------
@@ -58,6 +70,10 @@ class SimpleClient extends Node implements Client {
    * ---------------------------------------------------------------------------------------------*/
   private synchronized void handleReply(Reply m, Address sender) {
     // Your code here...
+    if (m.result().sequenceNum() == sequenceNum && result == null) {
+      result = m.result().result();
+      notify();
+    }
   }
 
   /* -----------------------------------------------------------------------------------------------
@@ -65,5 +81,9 @@ class SimpleClient extends Node implements Client {
    * ---------------------------------------------------------------------------------------------*/
   private synchronized void onClientTimer(ClientTimer t) {
     // Your code here...
+    if (t.sequenceNum() == sequenceNum && result == null) {
+      send(new Request(new AMOCommand(command, address(), sequenceNum)), serverAddress);
+      set(t, ClientTimer.CLIENT_RETRY_MILLIS);
+    }
   }
 }
