@@ -45,6 +45,7 @@ class PBClient extends Node implements Client {
     this.command = command;
     this.result = null;
     sendRequestToPrimary();
+    set(new ClientTimer(sequenceNum), ClientTimer.CLIENT_RETRY_MILLIS);
   }
 
   @Override
@@ -69,7 +70,6 @@ class PBClient extends Node implements Client {
     }
     AMOCommand amo = new AMOCommand(command, address(), sequenceNum);
     send(new Request(amo), view.primary());
-    set(new ClientTimer(sequenceNum), ClientTimer.CLIENT_RETRY_MILLIS);
   }
 
   /* -----------------------------------------------------------------------------------------------
@@ -85,8 +85,11 @@ class PBClient extends Node implements Client {
 
   private synchronized void handleViewReply(ViewReply m, Address sender) {
     // Your code here...
+    if (view != null && m.view().viewNum() <= view.viewNum()) {
+      return;
+    }
     this.view = m.view();
-    if(command != null && result == null) {
+    if (command != null && result == null) {
       sendRequestToPrimary();
     }
   }
@@ -96,12 +99,13 @@ class PBClient extends Node implements Client {
   /* -----------------------------------------------------------------------------------------------
    *  Timer Handlers
    * ---------------------------------------------------------------------------------------------*/
-  // only set timer when sending the request. don't duplicate timer.
+  // 1 timer per request chain
   private synchronized void onClientTimer(ClientTimer t) {
     // Your code here...
-    if(t.sequenceNum() == sequenceNum && result == null) {
+    if (t.sequenceNum() == sequenceNum && result == null) {
       send(new GetView(), viewServer);
       sendRequestToPrimary();
+      set(t, ClientTimer.CLIENT_RETRY_MILLIS);
     }
   }
 }

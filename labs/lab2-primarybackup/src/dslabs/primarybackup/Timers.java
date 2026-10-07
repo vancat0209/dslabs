@@ -31,9 +31,9 @@ final class StateTransferTimer implements Timer {
   private final int viewNum;
 }
 
-@Data 
+@Data
 final class ForwardTimer implements Timer {
-  static final int FORWARD_MILLIS = 100;
+  static final int FORWARD_MILLIS = 25;
   private final AMOCommand command;
   private final int viewNum;
 }

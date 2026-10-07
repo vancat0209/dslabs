@@ -1,6 +1,5 @@
 package dslabs.clientserver;
 
-
 import dslabs.atmostonce.AMOApplication;
 import dslabs.atmostonce.AMOResult;
 import dslabs.framework.Address;

@@ -4,11 +4,10 @@ import static dslabs.primarybackup.PingCheckTimer.PING_CHECK_MILLIS;
 
 import dslabs.framework.Address;
 import dslabs.framework.Node;
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
-
 import java.util.HashSet;
 import java.util.Set;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
@@ -45,11 +44,11 @@ class ViewServer extends Node {
   private void handlePing(Ping m, Address sender) {
     // Your code here...
     pingThisInterval.add(sender);
-    if(sender.equals(currentView.primary()) && m.viewNum() == currentView.viewNum()) {
+    if (sender.equals(currentView.primary()) && m.viewNum() == currentView.viewNum()) {
       primaryAcked = true;
     }
-    if(currentView.viewNum() == STARTUP_VIEWNUM) {
-      //call view init helper
+    if (currentView.viewNum() == STARTUP_VIEWNUM) {
+      // call view init helper
       viewInit(sender);
     } else {
       tryChangeView();
@@ -81,41 +80,42 @@ class ViewServer extends Node {
   private boolean isAlive(Address address) {
     return pingPrevInterval.contains(address) || pingThisInterval.contains(address);
   }
+
   private Address findIdle() {
-    for(Address a : pingThisInterval) {
-      if(!a.equals(currentView.primary()) && !a.equals(currentView.backup())) {
+    for (Address a : pingThisInterval) {
+      if (!a.equals(currentView.primary()) && !a.equals(currentView.backup())) {
         return a;
       }
     }
-    for(Address a : pingPrevInterval) {
-      if(!a.equals(currentView.primary()) && !a.equals(currentView.backup())) {
+    for (Address a : pingPrevInterval) {
+      if (!a.equals(currentView.primary()) && !a.equals(currentView.backup())) {
         return a;
       }
     }
     return null;
   }
+
   private void tryChangeView() {
     // stucked
-    if(!primaryAcked) {
+    if (!primaryAcked) {
       return;
     }
     Address newPrimary = currentView.primary();
     Address newBackup = currentView.backup();
-    if(newBackup == null){
+    if (newBackup == null) {
+      newBackup = findIdle();
+    } else if (!isAlive(currentView.backup())) {
+      newBackup = findIdle();
+    } else if (!isAlive(currentView.primary())) {
+      newPrimary = currentView.backup();
       newBackup = findIdle();
     }
-    else if(!isAlive(currentView.backup())){
-      newBackup = findIdle();
-    }
-    else if(!isAlive(currentView.primary())){
-        newPrimary = currentView.backup();
-        newBackup = findIdle();
-    } 
-    if(newPrimary != currentView.primary() || newBackup != currentView.backup()) {
+    if (newPrimary != currentView.primary() || newBackup != currentView.backup()) {
       currentView = new View(currentView.viewNum() + 1, newPrimary, newBackup);
       primaryAcked = false;
     }
   }
+
   private void viewInit(Address sender) {
     currentView = new View(INITIAL_VIEWNUM, sender, null);
     primaryAcked = false;

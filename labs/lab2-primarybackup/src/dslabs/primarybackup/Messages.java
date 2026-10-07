@@ -39,18 +39,21 @@ class Reply implements Message {
 }
 
 // Your code here...
-@Data 
+@Data
 class Forward implements Message {
   private final AMOCommand command;
+  private final int viewNum;
 }
 
 @Data
 class ForwardReply implements Message {
   private final boolean success;
   private final AMOResult result;
+  private final int viewNum;
+  private final AMOCommand command;
 }
 
-@Data 
+@Data
 class StateTransfer implements Message {
   private final AMOApplication<Application> app;
   private final int viewNum;
